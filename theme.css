@@ -1,0 +1,18 @@
+/* Sunset photo backgrounds: tickets section + the buy / order-received window.
+   Dark layers sit on top of the photo so the text stays easy to read. */
+#tickets {
+  background:
+    linear-gradient(rgba(6, 20, 13, 0.80), rgba(6, 20, 13, 0.90)),
+    url("images/bg-sunset.jpg") center / cover no-repeat;
+}
+
+.modal {
+  background:
+    linear-gradient(rgba(6, 20, 13, 0.78), rgba(6, 20, 13, 0.90)),
+    url("images/bg-sunset.jpg") center top / cover no-repeat;
+  background-attachment: local;
+}
+
+.modal::before {
+  display: none;
+}

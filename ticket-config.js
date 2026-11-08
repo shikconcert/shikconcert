@@ -10,6 +10,9 @@
 
   var cfg = {
     saleEnd: SALE_END,
+    // Telebirr account buyers pay to (shown after they tap Buy tickets).
+    // To change the number, edit it here and nowhere else.
+    telebirr: { name: "ADDIS ZEMEN", number: "0987654321" },
     // key  = stored in the database (do not rename existing ones)
     // prefix = letter used in each ticket's QR code ID
     // online:false = shown on the page but sold only at the gate
