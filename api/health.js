@@ -4,7 +4,7 @@ module.exports = async (req, res) => {
   const out = {
     ok: true,
     env: {
-      FIREBASE_SERVICE_ACCOUNT_KEY: !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY,
+      FIREBASE_SERVICE_ACCOUNT_KEY: !!(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_SERVICE_ACCOUNT_KEY),
       ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
       ADMIN_SESSION_SECRET: !!process.env.ADMIN_SESSION_SECRET,
     },
