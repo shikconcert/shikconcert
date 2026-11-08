@@ -1,0 +1,14 @@
+# Secrets — never commit these
+.env
+.env.*
+*.pem
+*service-account*.json
+*serviceAccount*.json
+*firebase-adminsdk*.json
+firebase-key*.json
+
+# Dependencies and local tooling
+node_modules/
+.netlify/
+.vercel/
+.DS_Store

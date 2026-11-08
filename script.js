@@ -1,0 +1,888 @@
+// ---------- Sale countdown ----------
+
+// Sale end date lives in ticket-config.js (shared with the server).
+const SALE_END = new Date(TICKET_CONFIG.saleEnd);
+
+function initCountdown() {
+  const wrap = document.getElementById("countdown");
+  const buyBtn = document.getElementById("buy-tickets-btn");
+  const daysEl = document.getElementById("cd-days");
+  const hoursEl = document.getElementById("cd-hours");
+  const minsEl = document.getElementById("cd-mins");
+  const secsEl = document.getElementById("cd-secs");
+
+  function pad(n) {
+    return String(n).padStart(2, "0");
+  }
+
+  // Hero bar countdown elements
+  const heroCd = document.getElementById("hero-countdown");
+  const hcdDays = document.getElementById("hcd-days");
+  const hcdHours = document.getElementById("hcd-hours");
+  const hcdMins = document.getElementById("hcd-mins");
+  const hcdSecs = document.getElementById("hcd-secs");
+
+  if (!SALE_END) {
+    if (wrap) wrap.hidden = true;
+    if (heroCd) heroCd.hidden = true;
+    return;
+  }
+
+  function tick() {
+    const diff = SALE_END.getTime() - Date.now();
+
+    if (diff <= 0) {
+      clearInterval(timer);
+      wrap.hidden = true;
+      if (heroCd) heroCd.hidden = true;
+      buyBtn.disabled = true;
+      buyBtn.setAttribute("data-i18n", "buy_button_ended");
+      buyBtn.textContent = t("buy_button_ended");
+      return;
+    }
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+
+    daysEl.textContent = pad(days);
+    hoursEl.textContent = pad(hours);
+    minsEl.textContent = pad(mins);
+    secsEl.textContent = pad(secs);
+
+    // Mirror to hero bar
+    if (hcdDays) hcdDays.textContent = pad(days);
+    if (hcdHours) hcdHours.textContent = pad(hours);
+    if (hcdMins) hcdMins.textContent = pad(mins);
+    if (hcdSecs) hcdSecs.textContent = pad(secs);
+  }
+
+  tick();
+  const timer = setInterval(tick, 1000);
+}
+
+// ---------- Buy Tickets modal ----------
+
+function initModal() {
+  const overlay = document.getElementById("modal-overlay");
+  const buyBtn = document.getElementById("buy-tickets-btn");
+  const heroBuyBtn = document.getElementById("hero-buy-btn");
+  const closeBtn = document.getElementById("modal-close");
+
+  function openModal() {
+    overlay.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeModal() {
+    overlay.hidden = true;
+    document.body.style.overflow = "";
+    stopStatusPolling();
+  }
+
+  buyBtn.addEventListener("click", () => {
+    if (!buyBtn.disabled) openModal();
+  });
+
+  // Hero button mirrors the in-section Buy Tickets button — same
+  // disabled state (sales-closed), same modal, no more scroll-to-form.
+  heroBuyBtn?.addEventListener("click", () => {
+    if (!buyBtn.disabled) openModal();
+  });
+
+  closeBtn.addEventListener("click", closeModal);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeModal();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !overlay.hidden) closeModal();
+  });
+}
+
+// ---------- Order form ----------
+
+// Ticket types, prices and sale windows live in ticket-config.js.
+const PACKAGE_PRICES_ETB = {};
+TICKET_CONFIG.types.forEach((tp) => (PACKAGE_PRICES_ETB[tp.key] = tp.price));
+
+function ticketLabel(tp) {
+  return getLang() === "am" ? tp.am : tp.en;
+}
+
+function totalEtbOf(tickets) {
+  return TICKET_CONFIG.types.reduce(
+    (sum, tp) => sum + (Number(tickets && tickets[tp.key]) || 0) * tp.price,
+    0
+  );
+}
+
+// "3 days left" / "Starts in 3 days" / "At the gate only" label for a type
+function timeTag(ms, kind) {
+  const hours = Math.ceil(ms / 3600000);
+  if (hours <= 24) {
+    return t(kind === "left" ? "tag_hours_left" : "tag_starts_hours").replace("{n}", hours);
+  }
+  const days = Math.ceil(ms / 86400000);
+  if (kind === "left") return t(days === 1 ? "tag_day_left" : "tag_days_left").replace("{n}", days);
+  return t(days === 1 ? "tag_starts_day" : "tag_starts_days").replace("{n}", days);
+}
+
+function ticketTag(tp, now) {
+  if (tp.online === false) return t("tag_gate");
+  const end = new Date(TICKET_CONFIG.saleEnd);
+  const until = tp.until ? new Date(tp.until) : end;
+  if (now >= end || now >= until) return t("tag_closed");
+  if (tp.from && now < new Date(tp.from)) return timeTag(new Date(tp.from) - now, "starts");
+  if (tp.until) return timeTag(until - now, "left");
+  return "";
+}
+
+function renderTierList() {
+  const ul = document.getElementById("tier-list");
+  if (!ul) return;
+  const now = new Date();
+  ul.innerHTML = TICKET_CONFIG.types
+    .map((tp) => {
+      const open = TICKET_CONFIG.isOpen(tp, now);
+      const tag = ticketTag(tp, now);
+      const cls = tp.key === "vip" ? "tier tier--vip" : open ? "tier tier--on" : "tier tier--off";
+      return `<li class="${cls}"><span>${ticketLabel(tp)}${tag ? ` <em class="tier__tag">${tag}</em>` : ""}</span><b>${formatEtb(tp.price)}</b></li>`;
+    })
+    .join("");
+}
+
+// Calls /api/<name>; if the site has no /api redirect (404), retries the
+// Netlify function URL directly.
+async function apiFetch(name, options) {
+  let res = await fetch("/api/" + name, options);
+  if (res.status === 404) {
+    try {
+      res = await fetch("/.netlify/functions/" + name, options);
+    } catch (e) {
+      /* keep the first response */
+    }
+  }
+  return res;
+}
+
+// Turns a failed response into an error with a message the buyer can read.
+async function serverError(res) {
+  let msg = "";
+  try {
+    const data = await res.json();
+    if (data && data.error) msg = data.error;
+  } catch (e) {
+    /* not JSON */
+  }
+  if (!msg) msg = t("form_error_server").replace("{code}", res.status);
+  const err = new Error(msg);
+  err.fromServer = true;
+  return err;
+}
+const MIN_TICKETS = 1;
+
+function formatEtb(amount) {
+  return amount.toLocaleString() + " ETB";
+}
+
+// Compress an uploaded image to a reasonable size before storing it
+// as a data URL (localStorage has limited space, and phone camera
+// screenshots can be large).
+function compressImage(file, maxWidth = 1000, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function initOrderForm() {
+  const form = document.getElementById("order-form");
+  const picker = document.getElementById("ticket-picker");
+  const hintEl = document.getElementById("ticket-picker-hint");
+  const totalEl = document.getElementById("order-total");
+  const errorEl = document.getElementById("order-error");
+  const submitBtn = document.getElementById("order-submit");
+  const container = document.getElementById("order-form-container");
+
+  const types = TICKET_CONFIG.types;
+  const qty = {};
+  types.forEach((tp) => (qty[tp.key] = 0));
+  const startNow = new Date();
+  const first =
+    types.find((tp) => tp.key === "normal" && TICKET_CONFIG.isOpen(tp, startNow)) ||
+    types.find((tp) => TICKET_CONFIG.isOpen(tp, startNow));
+  if (first) qty[first.key] = 1;
+
+  const maxFor = (tp) => tp.capacity || 50;
+  const total = () => types.reduce((n, tp) => n + qty[tp.key], 0);
+
+  picker.innerHTML = types
+    .map(
+      (tp) => `
+    <div class="ticket-picker__row" data-package="${tp.key}">
+      <div class="ticket-picker__info">
+        <span class="ticket-picker__name" data-role="name"></span>
+        <span class="ticket-picker__price">${formatEtb(tp.price)}</span>
+        <span class="ticket-picker__tag" data-role="tag" hidden></span>
+      </div>
+      <div class="stepper">
+        <button type="button" class="stepper__btn" data-decrease="${tp.key}" aria-label="Decrease">&minus;</button>
+        <span class="stepper__value" data-role="qty">0</span>
+        <button type="button" class="stepper__btn" data-increase="${tp.key}" aria-label="Increase">&plus;</button>
+      </div>
+    </div>`
+    )
+    .join("");
+
+  function render() {
+    if (!document.body.contains(picker)) return;
+    const now = new Date();
+    types.forEach((tp) => {
+      const row = picker.querySelector(`[data-package="${tp.key}"]`);
+      const open = TICKET_CONFIG.isOpen(tp, now);
+      if (!open) qty[tp.key] = 0;
+      row.querySelector('[data-role="name"]').textContent = ticketLabel(tp);
+      const tagEl = row.querySelector('[data-role="tag"]');
+      const tagText = ticketTag(tp, now);
+      tagEl.textContent = tagText;
+      tagEl.hidden = !tagText;
+      row.querySelector('[data-role="qty"]').textContent = qty[tp.key];
+      row.classList.toggle("ticket-picker__row--active", qty[tp.key] > 0);
+      row.classList.toggle("ticket-picker__row--locked", !open);
+      row.querySelector("[data-decrease]").disabled = !open || qty[tp.key] <= 0;
+      row.querySelector("[data-increase]").disabled = !open || qty[tp.key] >= maxFor(tp);
+    });
+    totalEl.textContent = formatEtb(totalEtbOf(qty));
+    hintEl.textContent = t("ticket_picker_hint");
+  }
+
+  picker.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn || btn.disabled) return;
+    const inc = btn.dataset.increase;
+    const dec = btn.dataset.decrease;
+    if (inc) qty[inc] += 1;
+    if (dec && qty[dec] > 0) qty[dec] -= 1;
+    render();
+  });
+
+  render();
+  setInterval(render, 30000);
+  ["lang-en", "lang-am"].forEach((id) => {
+    const b = document.getElementById(id);
+    if (b) b.addEventListener("click", () => setTimeout(render, 0));
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorEl.hidden = true;
+
+    const payload = {
+      fullName: document.getElementById("fullName").value.trim(),
+      phone: document.getElementById("phone").value.trim(),
+      tickets: Object.assign({}, qty),
+    };
+
+    if (!payload.fullName || !payload.phone) {
+      errorEl.textContent = t("form_error_required");
+      errorEl.hidden = false;
+      return;
+    }
+
+    // Ethiopian phone: must start with 09 or 07 and be exactly 10 digits
+    const phoneDigits = payload.phone.replace(/\D/g, "");
+    if (!/^(09|07)\d{8}$/.test(phoneDigits)) {
+      errorEl.textContent =
+        "Phone number must start with 09 or 07 and be 10 digits (e.g. 0912345678).";
+      errorEl.hidden = false;
+      return;
+    }
+    payload.phone = phoneDigits;
+
+    if (total() < MIN_TICKETS) {
+      errorEl.textContent = t("form_error_no_tickets");
+      errorEl.hidden = false;
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = t("submit_button_loading");
+
+    try {
+      const res = await apiFetch("checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw await serverError(res);
+
+      const data = await res.json();
+      finishOrder(container, data.reference, payload);
+    } catch (err) {
+      errorEl.textContent = err && err.fromServer ? err.message : t("form_error_network");
+      errorEl.hidden = false;
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = t("submit_button");
+    }
+  });
+}
+
+function finishOrder(container, reference, payload) {
+  // Calculate total from payload so we can show the exact amount to deposit
+  const totalEtb = totalEtbOf(payload.tickets);
+
+  container.innerHTML = `
+    <div class="order__success">
+      <h3>${t("success_heading")}</h3>
+      <p>${t("success_ref_label")}</p>
+      <p class="order__ref">${reference}</p>
+
+      <div class="telebirr-box">
+        <div class="telebirr-box__header">
+          <img src="data:image/png;base64,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" class="telebirr-box__logo" alt="Telebirr" />
+          <div class="telebirr-box__header-text">
+            <div class="telebirr-box__header-title">Deposit via Telebirr</div>
+            <div class="telebirr-box__header-sub">Send payment to the number below</div>
+          </div>
+        </div>
+        <div class="telebirr-box__body">
+          <div class="telebirr-box__row">
+            <span class="telebirr-box__label">Account name</span>
+            <span class="telebirr-box__value">ADDIS ZEMEN</span>
+          </div>
+          <div class="telebirr-box__row">
+            <span class="telebirr-box__label">Telebirr number</span>
+            <span class="telebirr-box__value telebirr-box__value--number">0987654321</span>
+          </div>
+          <div class="telebirr-box__amount">
+            <span class="telebirr-box__amount-label">Amount to send</span>
+            <span class="telebirr-box__amount-value">${totalEtb.toLocaleString()} ETB</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="screenshot-upload" id="screenshot-upload">
+        <label for="screenshot-input">${t("screenshot_label")}</label>
+        <div class="screenshot-upload__drop" id="screenshot-drop" onclick="document.getElementById('screenshot-input').click()">
+          <span class="screenshot-upload__icon">📎</span>
+          <span class="screenshot-upload__text" id="screenshot-filename">Tap to attach payment screenshot</span>
+        </div>
+        <input type="file" id="screenshot-input" accept="image/*" style="display:none" />
+        <button class="btn btn--ghost" type="button" id="screenshot-submit" disabled style="opacity:0.4;cursor:not-allowed;">
+          ${t("screenshot_button")}
+        </button>
+        <p class="order__error" id="screenshot-error" hidden></p>
+      </div>
+    </div>
+  `;
+
+  initScreenshotUpload(container, reference, payload);
+}
+
+function initScreenshotUpload(container, reference, payload) {
+  const input = document.getElementById("screenshot-input");
+  const submitBtn = document.getElementById("screenshot-submit");
+  const errorEl = document.getElementById("screenshot-error");
+  const uploadBox = document.getElementById("screenshot-upload");
+  const filenameEl = document.getElementById("screenshot-filename");
+  const dropEl = document.getElementById("screenshot-drop");
+
+  // Enable submit only once a file is chosen
+  input.addEventListener("change", () => {
+    const file = input.files && input.files[0];
+    if (file) {
+      submitBtn.disabled = false;
+      submitBtn.style.opacity = "1";
+      submitBtn.style.cursor = "pointer";
+      if (filenameEl) filenameEl.textContent = "✓ " + file.name;
+      if (dropEl) dropEl.classList.add("screenshot-upload__drop--chosen");
+    } else {
+      submitBtn.disabled = true;
+      submitBtn.style.opacity = "0.4";
+      submitBtn.style.cursor = "not-allowed";
+      if (filenameEl)
+        filenameEl.textContent = "Tap to attach payment screenshot";
+      if (dropEl) dropEl.classList.remove("screenshot-upload__drop--chosen");
+    }
+  });
+
+  submitBtn.addEventListener("click", async () => {
+    errorEl.hidden = true;
+    const file = input.files && input.files[0];
+
+    if (!file) {
+      errorEl.textContent = t("screenshot_error_none");
+      errorEl.hidden = false;
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = t("screenshot_button_loading");
+
+    try {
+      const dataUrl = await compressImage(file);
+
+      const res = await apiFetch("upload-screenshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference, screenshotBase64: dataUrl }),
+      });
+
+      if (!res.ok) throw await serverError(res);
+
+      startStatusPolling(container, reference, payload);
+    } catch (err) {
+      errorEl.textContent = err && err.fromServer ? err.message : t("screenshot_error_read");
+      errorEl.hidden = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = t("screenshot_button");
+    }
+  });
+}
+
+// ---------- Live status polling + ticket ----------
+//
+// After the screenshot is uploaded, the buyer's own browser polls
+// /api/order-status (public, keyed by reference+phone) so the ticket
+// appears here the instant an admin approves the order — no login
+// needed. Only runs while this modal/page stays open; if the buyer
+// closes it, polling stops (there's no "come back later and check"
+// page yet).
+
+const STATUS_POLL_INTERVAL_MS = 5000;
+const STATUS_POLL_TIMEOUT_MS = 45 * 60 * 1000; // give up nagging the server after 45 min
+let statusPollTimer = null;
+
+function stopStatusPolling() {
+  if (statusPollTimer) {
+    clearInterval(statusPollTimer);
+    statusPollTimer = null;
+  }
+}
+
+function startStatusPolling(container, reference, payload) {
+  container.innerHTML = `
+    <div class="order__success order__waiting" id="status-waiting">
+      <div class="spinner" aria-hidden="true"></div>
+      <h3>${t("waiting_heading")}</h3>
+      <p>${t("waiting_body")}</p>
+      <p class="order__ref">${reference}</p>
+      <p class="order__error" id="status-error" hidden></p>
+    </div>
+  `;
+
+  const startedAt = Date.now();
+
+  async function poll() {
+    if (Date.now() - startedAt > STATUS_POLL_TIMEOUT_MS) {
+      stopStatusPolling();
+      const waitingEl = document.getElementById("status-waiting");
+      if (waitingEl) {
+        waitingEl.querySelector(".spinner")?.remove();
+        waitingEl.querySelector("p").textContent = t("waiting_timeout");
+      }
+      return;
+    }
+
+    try {
+      const url = `/api/order-status?reference=${encodeURIComponent(
+        reference
+      )}&phone=${encodeURIComponent(payload.phone)}`;
+      const res = await apiFetch(url.replace(/^\/api\//, ""));
+      if (!res.ok) return; // transient network/server hiccup — just try again next tick
+
+      const order = await res.json();
+
+      if (order.status === "approved") {
+        stopStatusPolling();
+        renderTicket(container, order);
+      } else if (order.status === "rejected") {
+        stopStatusPolling();
+        renderRejected(container, order);
+      }
+      // pending_payment / pending_review: keep waiting silently
+    } catch (err) {
+      const errorEl = document.getElementById("status-error");
+      if (errorEl) {
+        errorEl.textContent = t("status_check_error");
+        errorEl.hidden = false;
+      }
+    }
+  }
+
+  poll();
+  statusPollTimer = setInterval(poll, STATUS_POLL_INTERVAL_MS);
+}
+
+function renderRejected(container, order) {
+  container.innerHTML = `
+    <div class="order__success">
+      <h3>${t("rejected_heading")}</h3>
+      <p>${t("rejected_body")}</p>
+      <p class="order__ref">${order.reference}</p>
+    </div>
+  `;
+}
+
+function renderTicket(container, order) {
+  const seats = buildSeatList(order);
+
+  container.innerHTML = `
+    <div class="tickets-result">
+      <h3 class="tickets-result__heading">${t("tickets_ready_heading")}</h3>
+      <p class="ticket__save-hint">${t("ticket_save_hint")}</p>
+      <div class="tickets-result__list">
+        ${seats.map((seat) => ticketCardHtml(order, seat)).join("")}
+      </div>
+    </div>
+  `;
+
+  seats.forEach((seat) => {
+    const qrHost = document.getElementById(`ticket-qr-${seat.seatId}`);
+    if (!qrHost) return;
+
+    const verifyUrl = `${location.origin}/verify?ref=${encodeURIComponent(
+      order.reference
+    )}&seat=${encodeURIComponent(seat.seatId)}&phone=${encodeURIComponent(
+      order.phone
+    )}`;
+
+    try {
+      qrHost.innerHTML = makeQrSvg(verifyUrl);
+    } catch (e) {
+      qrHost.textContent = seat.seatId;
+    }
+
+    const downloadBtn = document.getElementById(
+      `ticket-download-${seat.seatId}`
+    );
+    downloadBtn?.addEventListener("click", async () => {
+      downloadBtn.disabled = true;
+      const originalText = downloadBtn.textContent;
+      downloadBtn.textContent = t("ticket_download_loading");
+      try {
+        await downloadTicketImage(order, seat, verifyUrl);
+      } catch (e) {
+        // If canvas rendering fails for any reason, the ticket is still
+        // fully visible on-screen — screenshotting it still works fine.
+      } finally {
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = originalText;
+      }
+    });
+  });
+}
+
+// Builds a downloadable PNG of one ticket from scratch on a <canvas> —
+// deliberately not a screenshot of the DOM (which would need a whole
+// html2canvas-style library just for this one feature). It doesn't
+// pixel-match the on-screen card exactly, but carries the same info
+// and QR code, which is what actually matters at the door.
+function downloadTicketImage(order, seat, verifyUrl) {
+  return new Promise((resolve, reject) => {
+    const W = 1000;
+    const H = 600;
+    const SPLIT = 380;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d");
+
+    const tpDef = TICKET_CONFIG.types.find((x) => x.key === seat.packageType);
+    const packageLabel = tpDef ? ticketLabel(tpDef) : "";
+    const isVip = seat.packageType === "vip";
+
+    const poster = new Image();
+    poster.crossOrigin = "anonymous";
+
+    poster.onload = () => {
+      try {
+        // Left panel: poster image, cropped to cover (matches the
+        // on-screen crop: object-position 8% 12%, biased toward
+        // the top of the poster)
+        const scale = Math.max(SPLIT / poster.width, H / poster.height);
+        const pw = poster.width * scale;
+        const ph = poster.height * scale;
+        const px = (SPLIT - pw) * 0.08;
+        const py = (H - ph) * 0.12;
+        ctx.drawImage(poster, px, py, pw, ph);
+
+        // Right panel: navy gradient
+        const grad = ctx.createLinearGradient(SPLIT, 0, W, H);
+        grad.addColorStop(0, "#1c5139");
+        grad.addColorStop(0.6, "#123a28");
+        grad.addColorStop(1, "#06140d");
+        ctx.fillStyle = grad;
+        ctx.fillRect(SPLIT, 0, W - SPLIT, H);
+
+        // Dashed divider
+        ctx.strokeStyle = "rgba(214, 232, 107, 0.5)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.moveTo(SPLIT, 0);
+        ctx.lineTo(SPLIT, H);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const padX = SPLIT + 36;
+        let y = 56;
+
+        ctx.fillStyle = "#d6e86b";
+        ctx.font = "700 15px 'Work Sans', Arial";
+        ctx.fillText(t("ticket_eyebrow").toUpperCase(), padX, y);
+
+        y += 32;
+        ctx.fillStyle = "#f1f5e4";
+        ctx.font = "600 26px Georgia, serif";
+        ctx.fillText(t("ticket_subheading"), padX, y);
+
+        // Badge
+        y += 34;
+        ctx.font = "700 13px 'Work Sans', Arial";
+        const badgeText = packageLabel;
+        const badgeW = ctx.measureText(badgeText).width + 28;
+        ctx.fillStyle = isVip
+          ? "rgba(214, 232, 107, 0.2)"
+          : "rgba(157, 184, 159, 0.16)";
+        roundRect(ctx, padX, y - 18, badgeW, 28, 14);
+        ctx.fill();
+        if (isVip) {
+          ctx.strokeStyle = "#d6e86b";
+          ctx.lineWidth = 1;
+          roundRect(ctx, padX, y - 18, badgeW, 28, 14);
+          ctx.stroke();
+        }
+        ctx.fillStyle = isVip ? "#e8f58a" : "#f1f5e4";
+        ctx.fillText(badgeText, padX + 14, y);
+
+        // Divider
+        y += 26;
+        ctx.strokeStyle = "rgba(241, 245, 228, 0.2)";
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        ctx.moveTo(padX, y);
+        ctx.lineTo(W - 36, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Fields
+        const fields = [
+          [t("ticket_name_label"), order.fullName],
+          [t("ticket_phone_label"), order.phone],
+          [t("ticket_id_label"), seat.seatId],
+        ];
+        y += 30;
+        fields.forEach(([label, value]) => {
+          ctx.fillStyle = "#d6e86b";
+          ctx.font = "700 11px 'Work Sans', Arial";
+          ctx.fillText(label.toUpperCase(), padX, y);
+          y += 20;
+          ctx.fillStyle = "#f1f5e4";
+          ctx.font = "500 18px 'Work Sans', Arial";
+          ctx.fillText(String(value), padX, y);
+          y += 26;
+        });
+
+        // QR
+        const qrSvg = makeQrSvg(verifyUrl);
+        const qrImg = new Image();
+        const qrSize = 170;
+        const qrX = padX;
+        const qrY = H - qrSize - 60;
+
+        qrImg.onload = () => {
+          ctx.fillStyle = "#f1f5e4";
+          roundRect(ctx, qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 6);
+          ctx.fill();
+          ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+          ctx.fillStyle = "#9db89f";
+          ctx.font = "600 11px 'Work Sans', Arial";
+          ctx.fillText(
+            t("ticket_scan_label").toUpperCase(),
+            qrX,
+            qrY + qrSize + 26
+          );
+
+          finish();
+        };
+        qrImg.onerror = finish; // still download the card even if the QR image fails
+        qrImg.src =
+          "data:image/svg+xml;charset=utf-8," + encodeURIComponent(qrSvg);
+
+        function finish() {
+          canvas.toBlob((blob) => {
+            if (!blob) return reject(new Error("toBlob failed"));
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `ticket-${seat.seatId}.png`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            resolve();
+          }, "image/png");
+        }
+      } catch (e) {
+        reject(e);
+      }
+    };
+
+    poster.onerror = () => reject(new Error("Could not load poster image"));
+    poster.src = "images/poster.jpg";
+  });
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Every ticket TYPE bought (Normal + VIP) can be bought together in one
+// order now, and each individual ticket gets its own seat ID + QR code —
+// so a group of 5 friends can each show their own scannable ticket at
+// the door instead of passing around one shared code for the whole order.
+// `order.tickets` is the new shape ({ normal, vip }); the `quantity`/
+// `ticketType` fallback below is just so this still works against any
+// older order docs already sitting in Firestore from before this change.
+function buildSeatList(order) {
+  const tickets = order.tickets || {
+    [order.ticketType || "normal"]: order.quantity || 1,
+  };
+  return TICKET_CONFIG.seatIds(order.reference, tickets).map((x) => ({
+    seatId: x.id,
+    packageType: x.key,
+  }));
+}
+
+function ticketCardHtml(order, seat) {
+  const tpDef = TICKET_CONFIG.types.find((x) => x.key === seat.packageType);
+  const packageLabel = tpDef ? ticketLabel(tpDef) : "";
+
+  return `
+    <div class="ticket">
+      <div class="ticket__main">
+        <img class="ticket__poster" src="images/poster.jpg" alt="" />
+      </div>
+
+      <div class="ticket__stub">
+        <p class="ticket__eyebrow">${t("ticket_eyebrow")}</p>
+        <h3 class="ticket__heading">${t("ticket_subheading")}</h3>
+        <span class="ticket__badge ticket__badge--${
+          seat.packageType
+        }">${packageLabel}</span>
+
+        <dl class="ticket__fields">
+          <div>
+            <dt>${t("ticket_name_label")}</dt>
+            <dd>${escapeHtml(order.fullName)}</dd>
+          </div>
+          <div>
+            <dt>${t("ticket_phone_label")}</dt>
+            <dd>${escapeHtml(order.phone)}</dd>
+          </div>
+          <div>
+            <dt>${t("ticket_id_label")}</dt>
+            <dd class="ticket__id">${escapeHtml(seat.seatId)}</dd>
+          </div>
+        </dl>
+
+        <div class="ticket__qr" id="ticket-qr-${seat.seatId}"></div>
+        <p class="ticket__scan-label">${t("ticket_scan_label")}</p>
+        <button class="btn btn--ghost ticket__download-btn" type="button" id="ticket-download-${
+          seat.seatId
+        }">
+          ${t("ticket_download_button")}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// The vendored qrcode-generator library (vendor/qrcode.min.js, global
+// `qrcode`) needs an explicit "type number" (roughly, QR code size/
+// capacity) rather than picking one automatically — it throws if the
+// text doesn't fit the requested size. So we just try increasing sizes
+// until one fits, same as the library's own official demos do.
+//
+// We build the <svg> ourselves from the module grid (qr.isDark(row,col))
+// instead of using the library's own createSvgTag(): that helper emits a
+// fixed-pixel SVG with NO viewBox, so once CSS resizes it to fit the
+// ticket layout, browsers have nothing to scale the drawing coordinates
+// against — the QR can end up clipped or blank depending on the browser.
+// A real viewBox tied to the module count fixes that for good.
+function makeQrSvg(text) {
+  for (let typeNumber = 1; typeNumber <= 20; typeNumber++) {
+    try {
+      const qr = qrcode(typeNumber, "M");
+      qr.addData(text);
+      qr.make();
+
+      const count = qr.getModuleCount();
+      let path = "";
+      for (let row = 0; row < count; row++) {
+        for (let col = 0; col < count; col++) {
+          if (qr.isDark(row, col)) {
+            path += `M${col},${row}h1v1h-1z`;
+          }
+        }
+      }
+
+      return (
+        `<svg viewBox="0 0 ${count} ${count}" xmlns="http://www.w3.org/2000/svg" ` +
+        `shape-rendering="crispEdges" preserveAspectRatio="xMidYMid meet">` +
+        `<rect width="${count}" height="${count}" fill="#ffffff"/>` +
+        `<path d="${path}" fill="#111"/></svg>`
+      );
+    } catch (e) {
+      // too small for this typeNumber — try the next size up
+    }
+  }
+  throw new Error("Could not generate QR code");
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str == null ? "" : String(str);
+  return div.innerHTML;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initCountdown();
+  renderTierList();
+  setInterval(renderTierList, 60000);
+  ["lang-en", "lang-am"].forEach((id) => {
+    const b = document.getElementById(id);
+    if (b) b.addEventListener("click", () => setTimeout(renderTierList, 0));
+  });
+  initModal();
+  initOrderForm();
+});

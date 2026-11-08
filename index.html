@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>ሽክ — SHIK in the Garden</title>
+    <meta
+      name="description"
+      content="ሽክ — SHIK in the Garden concert, Nov 14, 2026 at Ghion Hotel Gardens, Addis Ababa. Mera Events × Coca-Cola. Tickets from 3,000 ETB."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+Ethiopic:wght@800&family=Work+Sans:wght@400;500;600&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="lang-bar">
+      <div class="wrap lang-bar__inner">
+        <div class="lang-bar__langs">
+          <button class="lang-btn" id="lang-en" type="button">English</button>
+          <span class="lang-bar__sep">/</span>
+          <button class="lang-btn" id="lang-am" type="button">አማርኛ</button>
+        </div>
+        <div class="topbar__cta">
+          <div class="hero__countdown" id="hero-countdown">
+            <div class="hero__cd-unit"><span id="hcd-days">00</span><small data-i18n="days">Days</small></div>
+            <div class="hero__cd-sep">:</div>
+            <div class="hero__cd-unit"><span id="hcd-hours">00</span><small data-i18n="hours">Hrs</small></div>
+            <div class="hero__cd-sep">:</div>
+            <div class="hero__cd-unit"><span id="hcd-mins">00</span><small data-i18n="mins">Min</small></div>
+            <div class="hero__cd-sep">:</div>
+            <div class="hero__cd-unit"><span id="hcd-secs">00</span><small data-i18n="secs">Sec</small></div>
+          </div>
+          <button class="btn" type="button" id="hero-buy-btn" data-i18n="hero_cta">Buy Tickets</button>
+        </div>
+      </div>
+    </div>
+
+    <header class="hero">
+      <img class="hero__banner" src="images/hero.jpg" width="1280" height="640" alt="SHIK in the Garden: Dawit Melese, Efrem Tamiru and Micheal Belayneh live at Ghion Hotel Gardens, Nov 14, 2026" />
+      </header>
+
+    <section class="lineup" id="lineup">
+      <div class="lineup__head wrap">
+        <p class="section__label" data-i18n="lineup_label">The lineup</p>
+        <h2 class="section__heading" data-i18n="lineup_heading">Performing live</h2>
+      </div>
+      <div class="lineup__scroll-track">
+        <div class="lineup__card">
+          <img src="images/artist-micheal.jpg" width="440" height="550" alt="Micheal Belayneh" class="lineup__img" loading="lazy" />
+          <div class="lineup__caption"><b>ሚካኤል በላይነህ</b><span>Micheal Belayneh</span></div>
+        </div>
+        <div class="lineup__card">
+          <img src="images/artist-efrem.jpg" width="440" height="550" alt="Efrem Tamiru" class="lineup__img" loading="lazy" />
+          <div class="lineup__caption"><b>ኤፍሬም ታምሩ</b><span>Efrem Tamiru</span></div>
+        </div>
+        <div class="lineup__card">
+          <img src="images/artist-dawit.jpg" width="440" height="550" alt="Dawit Melese" class="lineup__img" loading="lazy" />
+          <div class="lineup__caption"><b>ዳዊት መለሰ</b><span>Dawit Melese</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="teaser">
+      <div class="wrap">
+        <h2 class="section__heading" data-i18n="teaser_heading">Watch the teaser</h2>
+        <video controls playsinline preload="none" poster="images/teaser-poster.jpg" src="images/teaser.mp4"></video>
+      </div>
+    </section>
+
+    <section class="venue">
+      <div class="wrap">
+        <p class="section__label" data-i18n="venue_label">The venue</p>
+        <div class="venue__grid">
+          <div class="venue__body">
+            <h2 class="section__heading" data-i18n="venue_heading">
+              An evening in the garden
+            </h2>
+            <p data-i18n="venue_body">
+              ሽክ is a night to dress sharp and enjoy live music outdoors at Ghion Hotel Gardens, with Dawit Melese, Efrem Tamiru and Micheal Belayneh. Organized by Mera Events with Coca-Cola.
+            </p>
+          </div>
+          <dl class="venue__facts">
+            <div class="fact"><dt data-i18n="fact_location_label">Location</dt><dd data-i18n="fact_location_value">Ghion Hotel Gardens</dd></div>
+            <div class="fact"><dt data-i18n="fact_date_label">Date</dt><dd data-i18n="fact_date_value">Nov 14, 2026</dd></div>
+            <div class="fact"><dt data-i18n="fact_doors_label">Doors open</dt><dd data-i18n="fact_doors_value">6:30 PM</dd></div>
+          </dl>
+        </div>
+
+        <div class="sponsors">
+          <p class="sponsors__label" data-i18n="organizer_label">Organized by</p>
+          <div class="sponsors__main">
+            <img src="images/sponsors/mera.png" alt="Mera Events" loading="lazy" />
+            <span class="sponsors__x" aria-hidden="true">×</span>
+            <img src="images/sponsors/cocacola.png" alt="Coca-Cola" loading="lazy" />
+          </div>
+          <p class="sponsors__label" data-i18n="partners_label">Partners</p>
+          <div class="sponsors__grid">
+            <img src="images/sponsors/bedele.png" alt="Bedele Special" loading="lazy" />
+            <img src="images/sponsors/polo.png" alt="Polo Streaming" loading="lazy" />
+            <img src="images/sponsors/timecode.png" alt="Timecode Media, Communication, Innovation" loading="lazy" />
+            <img src="images/sponsors/johny.png" alt="Johny Video Production" loading="lazy" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tickets">
+      <div class="wrap">
+        <p class="section__label" data-i18n="tickets_label">Tickets</p>
+        <h2 class="section__heading" data-i18n="tickets_heading">
+          Choose your ticket
+        </h2>
+
+        <div class="package">
+          <div class="stub">
+            <div class="stub__top">
+              <span class="stub__name" data-i18n="package_name"
+                >Main Event</span
+              >
+              <span class="stub__price">2,500 <small>ETB</small></span>
+            </div>
+            <ul id="tier-list"></ul>
+            <p class="stub__note" data-i18n="stub_note">
+              First wave is on sale now. When it sells out, the second wave opens at a higher price. Tickets at the gate are sold on the night, subject to availability. VVIP includes dinner.
+            </p>
+            
+
+            <div class="countdown" id="countdown">
+              <p class="countdown__label" data-i18n="countdown_label">
+                Ticket sales end in
+              </p>
+              <div class="countdown__digits">
+                <div class="countdown__unit">
+                  <span id="cd-days">00</span>
+                  <small data-i18n="days">Days</small>
+                </div>
+                <div class="countdown__unit">
+                  <span id="cd-hours">00</span>
+                  <small data-i18n="hours">Hrs</small>
+                </div>
+                <div class="countdown__unit">
+                  <span id="cd-mins">00</span>
+                  <small data-i18n="mins">Min</small>
+                </div>
+                <div class="countdown__unit">
+                  <span id="cd-secs">00</span>
+                  <small data-i18n="secs">Sec</small>
+                </div>
+              </div>
+              <p class="countdown__target" data-i18n="countdown_target">
+                
+              </p>
+            </div>
+
+            <button
+              class="btn btn--buy"
+              id="buy-tickets-btn"
+              data-i18n="buy_button_active"
+            >
+              Buy Tickets
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap footer__row">
+        <span data-i18n="footer_title">ሽክ — SHIK in the Garden</span>
+        <span data-i18n="footer_location">Mera Events × Coca-Cola</span>
+      </div>
+    </footer>
+
+    <div class="modal-overlay" id="modal-overlay" hidden>
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
+        <button class="modal__close" id="modal-close" aria-label="Close">
+          &times;
+        </button>
+
+        <div id="modal-body">
+          <p class="order__disclaimer" data-i18n="modal_intro">
+            <span class="order__disclaimer-icon">🎫</span>
+            Fill in your details to reserve your tickets. Payment is currently
+            handled manually — you'll be contacted directly to complete it.
+          </p>
+
+          <div id="order-form-container">
+            <form id="order-form" novalidate>
+              <div class="field">
+                <label for="fullName" data-i18n="field_fullname"
+                  >Full name</label
+                >
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  required
+                  autocomplete="name"
+                />
+              </div>
+
+              <div class="field">
+                <label for="phone" data-i18n="field_phone">Phone</label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  required
+                  autocomplete="tel"
+                  placeholder="+251 9xx xxx xxx"
+                />
+              </div>
+
+              <div class="field">
+                <label data-i18n="field_package">Tickets</label>
+                <div class="ticket-picker" id="ticket-picker"></div>
+                <p
+                  class="ticket-picker__hint"
+                  id="ticket-picker-hint"
+                  data-i18n="ticket_picker_hint"
+                >
+                  Mix and match — pick any number of each.
+                </p>
+              </div>
+
+              <div class="order__total">
+                <span data-i18n="total_label">Total</span>
+                <strong id="order-total">3,000 ETB</strong>
+              </div>
+
+              <button
+                class="btn"
+                type="submit"
+                id="order-submit"
+                data-i18n="submit_button"
+              >
+                Reserve tickets
+              </button>
+
+              <p class="order__error" id="order-error" hidden></p>
+
+              <p class="order__disclaimer" data-i18n="order_disclaimer">
+                This reserves your order. Payment is handled manually for now —
+                you'll be contacted to complete payment and confirm your ticket.
+              </p>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="vendor/qrcode.min.js"></script>
+    <script src="i18n.js"></script>
+    <script src="ticket-config.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

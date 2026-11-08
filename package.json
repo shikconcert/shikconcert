@@ -1,0 +1,7 @@
+{
+  "name": "shik-in-the-garden",
+  "private": true,
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}
