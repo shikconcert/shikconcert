@@ -76,10 +76,13 @@ function initModal() {
     document.body.style.overflow = "hidden";
   }
 
+  openOrderModal = openModal;
+
+  // Polling keeps running while the modal is hidden, so reopening it shows
+  // the ticket if it was approved in the meantime.
   function closeModal() {
     overlay.hidden = true;
     document.body.style.overflow = "";
-    stopStatusPolling();
   }
 
   buyBtn.addEventListener("click", () => {
@@ -184,6 +187,92 @@ async function serverError(res) {
   return err;
 }
 const MIN_TICKETS = 1;
+
+// Where buyers send their Telebirr payment.
+const TELEBIRR_NUMBER = "0958684843";
+
+// Ethiopian mobile numbers: accepts 09xxxxxxxx, 07xxxxxxxx, +2519xxxxxxxx,
+// +2517xxxxxxxx, 2519..., 002519... or 9xxxxxxxx. Returns "09xxxxxxxx" /
+// "07xxxxxxxx", or null when it isn't a valid mobile number.
+function normalizeEthPhone(input) {
+  let d = String(input || "").replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  let local = null;
+  if (d.length === 12 && d.startsWith("251")) local = d.slice(3);
+  else if (d.length === 10 && d.startsWith("0")) local = d.slice(1);
+  else if (d.length === 9) local = d;
+  if (!local || !/^[79]\d{8}$/.test(local)) return null;
+  return "0" + local;
+}
+
+// Copy text to the clipboard (with a fallback for older phones / http).
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {
+    /* fall through to the old way */
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ---- Remember the buyer's order on this device ----
+// Only the reference + phone are saved (never the screenshot), so a reload
+// or a later visit brings back the right screen instead of a blank form.
+const ACTIVE_ORDER_KEY = "shik_active_order_v1";
+
+function saveActiveOrder(reference, phone) {
+  try {
+    localStorage.setItem(ACTIVE_ORDER_KEY, JSON.stringify({ reference, phone }));
+  } catch (e) {
+    /* storage blocked (private mode) — the order still works, just not remembered */
+  }
+}
+
+function loadActiveOrder() {
+  try {
+    const o = JSON.parse(localStorage.getItem(ACTIVE_ORDER_KEY) || "null");
+    return o && o.reference && o.phone ? o : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearActiveOrder() {
+  try {
+    localStorage.removeItem(ACTIVE_ORDER_KEY);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function wireNewOrderButton() {
+  const btn = document.getElementById("new-order-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    clearActiveOrder();
+    stopStatusPolling();
+    location.reload();
+  });
+}
+
+let openOrderModal = () => {};
 
 function formatEtb(amount) {
   return amount.toLocaleString() + " ETB";
@@ -308,15 +397,14 @@ function initOrderForm() {
       return;
     }
 
-    // Ethiopian phone: must start with 09 or 07 and be exactly 10 digits
-    const phoneDigits = payload.phone.replace(/\D/g, "");
-    if (!/^(09|07)\d{8}$/.test(phoneDigits)) {
-      errorEl.textContent =
-        "Phone number must start with 09 or 07 and be 10 digits (e.g. 0912345678).";
+    // Ethiopian mobile: 09xxxxxxxx, 07xxxxxxxx, +2519xxxxxxxx or +2517xxxxxxxx
+    const cleanPhone = normalizeEthPhone(payload.phone);
+    if (!cleanPhone) {
+      errorEl.textContent = t("phone_error");
       errorEl.hidden = false;
       return;
     }
-    payload.phone = phoneDigits;
+    payload.phone = cleanPhone;
 
     if (total() < MIN_TICKETS) {
       errorEl.textContent = t("form_error_no_tickets");
@@ -336,6 +424,7 @@ function initOrderForm() {
       if (!res.ok) throw await serverError(res);
 
       const data = await res.json();
+      saveActiveOrder(data.reference, payload.phone);
       finishOrder(container, data.reference, payload);
     } catch (err) {
       errorEl.textContent = err && err.fromServer ? err.message : t("form_error_network");
@@ -368,11 +457,14 @@ function finishOrder(container, reference, payload) {
         <div class="telebirr-box__body">
           <div class="telebirr-box__row">
             <span class="telebirr-box__label">Account name</span>
-            <span class="telebirr-box__value">${TICKET_CONFIG.telebirr.name}</span>
+            <span class="telebirr-box__value">ADDIS ZEMEN</span>
           </div>
           <div class="telebirr-box__row">
             <span class="telebirr-box__label">Telebirr number</span>
-            <span class="telebirr-box__value telebirr-box__value--number">${TICKET_CONFIG.telebirr.number}</span>
+            <span class="telebirr-box__copyrow">
+              <span class="telebirr-box__value telebirr-box__value--number" id="telebirr-number">${TELEBIRR_NUMBER}</span>
+              <button type="button" class="copy-btn" id="copy-number-btn">${t("copy_button")}</button>
+            </span>
           </div>
           <div class="telebirr-box__amount">
             <span class="telebirr-box__amount-label">Amount to send</span>
@@ -395,6 +487,19 @@ function finishOrder(container, reference, payload) {
       </div>
     </div>
   `;
+
+  const copyBtn = document.getElementById("copy-number-btn");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      const ok = await copyText(TELEBIRR_NUMBER);
+      copyBtn.textContent = ok ? t("copied_button") : TELEBIRR_NUMBER;
+      copyBtn.classList.toggle("copy-btn--done", ok);
+      setTimeout(() => {
+        copyBtn.textContent = t("copy_button");
+        copyBtn.classList.remove("copy-btn--done");
+      }, 2000);
+    });
+  }
 
   initScreenshotUpload(container, reference, payload);
 }
@@ -540,8 +645,10 @@ function renderRejected(container, order) {
       <h3>${t("rejected_heading")}</h3>
       <p>${t("rejected_body")}</p>
       <p class="order__ref">${order.reference}</p>
+      <button type="button" class="btn btn--ghost" id="new-order-btn">${t("new_order_button")}</button>
     </div>
   `;
+  wireNewOrderButton();
 }
 
 function renderTicket(container, order) {
@@ -554,8 +661,10 @@ function renderTicket(container, order) {
       <div class="tickets-result__list">
         ${seats.map((seat) => ticketCardHtml(order, seat)).join("")}
       </div>
+      <button type="button" class="btn btn--ghost" id="new-order-btn">${t("new_order_button")}</button>
     </div>
   `;
+  wireNewOrderButton();
 
   seats.forEach((seat) => {
     const qrHost = document.getElementById(`ticket-qr-${seat.seatId}`);
@@ -875,6 +984,36 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// Bring the buyer back to where they were (payment step, waiting for
+// approval, ticket, or rejected) after a reload or a later visit.
+async function resumeActiveOrder() {
+  const saved = loadActiveOrder();
+  if (!saved) return;
+  const container = document.getElementById("order-form-container");
+  if (!container) return;
+
+  let order;
+  try {
+    const url = `order-status?reference=${encodeURIComponent(saved.reference)}&phone=${encodeURIComponent(saved.phone)}`;
+    const res = await apiFetch(url);
+    if (res.status === 404) {
+      clearActiveOrder(); // order no longer exists — start fresh
+      return;
+    }
+    if (!res.ok) return; // temporary problem: keep the saved order, show the form
+    order = await res.json();
+  } catch (e) {
+    return; // offline: keep the saved order, show the form
+  }
+
+  const payload = { phone: saved.phone, tickets: order.tickets || {} };
+  if (order.status === "approved") renderTicket(container, order);
+  else if (order.status === "rejected") renderRejected(container, order);
+  else if (order.status === "pending_review") startStatusPolling(container, saved.reference, payload);
+  else finishOrder(container, saved.reference, payload); // pending_payment: pay + attach screenshot
+  openOrderModal();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initCountdown();
   renderTierList();
@@ -885,4 +1024,5 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   initModal();
   initOrderForm();
+  resumeActiveOrder();
 });

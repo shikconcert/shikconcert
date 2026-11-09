@@ -16,9 +16,7 @@ const CFG = require("../ticket-config");
 
 const db = admin.firestore();
 
-function normalizePhone(phone) {
-  return String(phone || "").replace(/[^\d]/g, "");
-}
+const { samePhone } = require("./_phone");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -43,7 +41,7 @@ module.exports = async (req, res) => {
 
       const order = snap.data();
 
-      if (normalizePhone(order.phone) !== normalizePhone(phone)) {
+      if (!samePhone(order.phone, phone)) {
         // Same "not found" as a missing doc — don't let this endpoint
         // confirm whether a reference exists.
         return { outcome: "not_found" };

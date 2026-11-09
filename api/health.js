@@ -16,7 +16,14 @@ module.exports = async (req, res) => {
     const source = b64 ? "BASE64" : rawEnv ? "KEY" : "none";
     let text = "";
     if (b64) text = Buffer.from(b64.trim(), "base64").toString("utf8");
-    else if (rawEnv) text = rawEnv;
+    else if (rawEnv) {
+      text = rawEnv;
+      const t = rawEnv.trim();
+      if (!t.includes("{") && /^[A-Za-z0-9+\/=\s]+$/.test(t)) {
+        const d = Buffer.from(t.replace(/\s+/g, ""), "base64").toString("utf8");
+        if (d.includes("private_key")) text = d;
+      }
+    }
     out.keyCheck = {
       using: source,
       savedLength: (b64 || rawEnv || "").length,

@@ -100,11 +100,15 @@ const translations = {
     screenshot_error_read: "Could not read that file. Try another image.",
 
     waiting_heading: "Awaiting approval",
-    waiting_body: "Keep this page open — your ticket will appear here the moment our team approves your payment.",
+    waiting_body: "Your payment screenshot was received. Your ticket will appear here once our team approves it. You can safely close or reload this page and come back — we'll remember your order on this device.",
     waiting_timeout: "Still awaiting approval. You can close this page — check back with your reference number, or contact the organizers.",
     rejected_heading: "Payment not confirmed",
     rejected_body: "We couldn't confirm your payment. Please contact the organizers with your reference number below.",
     status_check_error: "Could not check your order status — check your connection.",
+    phone_error: "Enter a valid Ethiopian mobile number, e.g. 0912345678 or +251912345678.",
+    copy_button: "Copy",
+    copied_button: "Copied ✓",
+    new_order_button: "Order more tickets",
 
     tickets_ready_heading: "Your tickets are ready",
     ticket_eyebrow: "SHIK in the Garden",
@@ -212,11 +216,15 @@ const translations = {
     screenshot_error_read: "ፋይሉን ማንበብ አልተቻለም። እባክዎ ሌላ ምስል ይሞክሩ።",
 
     waiting_heading: "ማረጋገጫ በመጠበቅ ላይ",
-    waiting_body: "ይህን ገጽ ክፍት ያድርጉት — ትዕዛዝዎ ሲረጋገጥ ትኬትዎ እዚሁ ይታያል።",
+    waiting_body: "የክፍያ ስክሪንሾትዎ ደርሶናል። ትዕዛዝዎ ሲረጋገጥ ትኬትዎ እዚሁ ይታያል። ገጹን ዘግተው ወይም አድሰው መመለስ ይችላሉ — ትዕዛዝዎ በዚህ ስልክ ላይ ይታወሳል።",
     waiting_timeout: "አሁንም በመጠበቅ ላይ ነው። ይህን ገጽ ዘግተው በማጣቀሻ ቁጥርዎ ቆይተው ማየት ወይም አዘጋጆቹን ማነጋገር ይችላሉ።",
     rejected_heading: "ክፍያ አልተረጋገጠም",
     rejected_body: "ክፍያዎን ማረጋገጥ አልቻልንም። እባክዎ ከታች ባለው የማጣቀሻ ቁጥርዎ አዘጋጆቹን ያነጋግሩ።",
     status_check_error: "የትዕዛዝዎን ሁኔታ ማየት አልተቻለም — ግንኙነትዎን ያረጋግጡ።",
+    phone_error: "ትክክለኛ የኢትዮጵያ ሞባይል ቁጥር ያስገቡ፣ ለምሳሌ 0912345678 ወይም +251912345678።",
+    copy_button: "ቅዳ",
+    copied_button: "ተቀድቷል ✓",
+    new_order_button: "ተጨማሪ ትኬት ይግዙ",
 
     tickets_ready_heading: "ትኬቶችዎ ዝግጁ ናቸው",
     ticket_eyebrow: "ሽክ በአትክልት ስፍራ",

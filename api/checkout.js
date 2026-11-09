@@ -6,6 +6,7 @@
 
 const admin = require("./_firebaseAdmin");
 const CFG = require("../ticket-config");
+const { normalizePhone } = require("./_phone");
 
 const db = admin.firestore();
 
@@ -23,6 +24,12 @@ module.exports = async (req, res) => {
   const { fullName, phone, tickets } = req.body || {};
   if (!fullName || !phone) {
     return res.status(400).json({ error: "Missing or invalid order details." });
+  }
+  const cleanPhone = normalizePhone(phone);
+  if (!cleanPhone) {
+    return res.status(400).json({
+      error: "Phone number must be an Ethiopian mobile number, e.g. 0912345678 or +251912345678.",
+    });
   }
 
   const now = new Date();
@@ -54,7 +61,7 @@ module.exports = async (req, res) => {
   const orderData = {
     reference,
     fullName: String(fullName).slice(0, 120),
-    phone: String(phone).slice(0, 30),
+    phone: cleanPhone,
     tickets: qtys,
     totalEtb,
     status: "pending_payment",

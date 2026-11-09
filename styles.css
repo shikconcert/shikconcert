@@ -1672,3 +1672,39 @@ footer {
 .tier__tag{font-style:normal;margin-left:8px;padding:2px 9px;border-radius:999px;background:var(--gold);color:#10240f;font-size:.72rem;font-weight:700}
 .tier--off{opacity:.65}
 .tier--off .tier__tag{background:transparent;border:1px solid var(--muted);color:var(--muted)}
+
+
+/* ---------- Telebirr number + copy button ---------- */
+.telebirr-box__copyrow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.telebirr-box__copyrow .telebirr-box__value {
+  max-width: none;
+}
+.copy-btn {
+  appearance: none;
+  border: 1px solid #e8420a;
+  background: #fff;
+  color: #e8420a;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 8px 12px;
+  min-height: 34px;
+  min-width: 64px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-shadow: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.copy-btn:hover { background: rgba(232, 66, 10, 0.08); }
+.copy-btn:active { transform: scale(0.97); }
+.copy-btn.copy-btn--done { background: #1a8f4c; border-color: #1a8f4c; color: #fff; text-shadow: none; }
+.order__success .btn#new-order-btn { margin-top: 16px; }

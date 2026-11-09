@@ -14,9 +14,7 @@ const admin = require("./_firebaseAdmin");
 
 const db = admin.firestore();
 
-function normalizePhone(phone) {
-  return String(phone || "").replace(/[^\d]/g, "");
-}
+const { samePhone } = require("./_phone");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -40,7 +38,7 @@ module.exports = async (req, res) => {
 
     const order = snap.data();
 
-    if (normalizePhone(order.phone) !== normalizePhone(phone)) {
+    if (!samePhone(order.phone, phone)) {
       // Deliberately the same "not found" message as a missing doc, so
       // this endpoint can't be used to confirm whether a reference exists.
       return res.status(404).json({ error: "Order not found." });

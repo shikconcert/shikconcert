@@ -108,7 +108,7 @@ phone, and you see it immediately in `/admin.html` on your laptop.
 
 | Variable | Purpose |
 |---|---|
-| `FIREBASE_SERVICE_ACCOUNT_KEY` | Full service account JSON (minified to one line) — Firebase Console → Project Settings → Service Accounts → Generate new private key |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` (or `FIREBASE_SERVICE_ACCOUNT_BASE64`) | Full service account JSON (one line), or the same file base64-encoded — either variable accepts either form — Firebase Console → Project Settings → Service Accounts → Generate new private key |
 | `ADMIN_PASSWORD` | The password for `/admin.html` |
 | `ADMIN_SESSION_SECRET` | Any long random string — signs the admin session cookie |
 
@@ -160,3 +160,10 @@ the suggested shape of the SantimPay integration (create payment
 session, redirect the user, add a webhook for confirmation). Buyers
 currently pay via Telebirr manually and upload a screenshot for admin
 approval, as described above.
+
+
+## Payment number, phone formats, and remembering orders
+
+- Telebirr number shown to buyers: `TELEBIRR_NUMBER` at the top of `script.js` (has a Copy button).
+- Phone numbers accepted: `09…`, `07…`, `+2519…`, `+2517…`, `2519…`. Stored as `09xxxxxxxx` / `07xxxxxxxx` (see `api/_phone.js`).
+- After ordering, the reference + phone are remembered in the buyer's browser (`shik_active_order_v1`). Reloading brings back the payment step, the waiting screen, the approved tickets, or the rejected notice. Clearing browser data or switching device loses this.

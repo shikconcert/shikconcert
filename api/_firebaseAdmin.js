@@ -14,6 +14,18 @@ function setupError(message) {
   return e;
 }
 
+// If the value is base64 text (no "{" in it), decode it. Lets the key work
+// whether it was pasted into ..._KEY or ..._BASE64.
+function decodeIfBase64(raw) {
+  const t = String(raw || "").trim();
+  if (t && !t.includes("{") && /^[A-Za-z0-9+/=\s]+$/.test(t)) {
+    try {
+      const d = Buffer.from(t.replace(/\s+/g, ""), "base64").toString("utf8");
+      if (d.includes("private_key")) return d;
+    } catch (e) {}
+  }
+  return t;
+}
 // Accepts the key as valid JSON, or — if it was pasted in a way that broke
 // the JSON (line breaks, wrapping quotes) — pulls the three needed fields out.
 function parseServiceAccount(raw) {
@@ -55,6 +67,7 @@ if (!admin.apps.length) {
   } else {
     raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || null;
   }
+  if (raw) raw = decodeIfBase64(raw);
   if (!raw) {
     throw setupError(
       "Server setup incomplete: set FIREBASE_SERVICE_ACCOUNT_BASE64 (or FIREBASE_SERVICE_ACCOUNT_KEY) in the Netlify environment variables."
